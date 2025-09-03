@@ -125,7 +125,6 @@ const DocumentSigning = ({
       formData.append('signers', JSON.stringify(signers));
       formData.append('metadata', JSON.stringify(processedMetadata));
 
-      // Use unified endpoint for all services
       const response = await fetch(`${baseUrl}/api/${currentService}/sign`, {
         method: 'POST',
         headers: {
@@ -182,22 +181,6 @@ const DocumentSigning = ({
       default:
         return '';
     }
-  };
-
-  const isServiceCompleted = (service) => {
-    return service === 'selfsign';
-  };
-
-  const getDownloadUrl = (service, documentId) => {
-    if (service === 'selfsign') {
-      return `${baseUrl}/api/selfsign/documents/${documentId}/download`;
-    }
-    // Add other service download URLs as needed
-    return null;
-  };
-
-  const getDocumentUrl = (service, documentId) => {
-    return `${baseUrl}/documents/${documentId}`;
   };
 
   return (
@@ -359,7 +342,7 @@ const DocumentSigning = ({
       {/* Error Display */}
       {error && <div className="error-message">{error}</div>}
 
-      {/* Results Display - Unified for all services */}
+      {/* Results Display */}
       {result && (
         <div className="result">
           <h3>✅ Document signing initiated with {getServiceName(currentService)}</h3>
@@ -385,58 +368,54 @@ const DocumentSigning = ({
             </div>
           )}
 
-          {/* Service-specific result display */}
-          {isServiceCompleted(currentService) ? (
-            /* Completed services (like selfsign) */
-            <div className="completed-service-result">
-              <div className="success-message">
-                {getServiceIcon(currentService)} <strong>Document signed successfully!</strong>
-              </div>
-              <p>✅ All signatures have been applied.</p>
-              <p>📋 The document is ready for download and validation.</p>
+          {/* Special handling for selfsign */}
+{currentService === 'selfsign' ? (
+  <div className="selfsign-result">
+    <div className="success-message">
+      🔐 <strong>Document signed successfully!</strong>
+    </div>
+    <p>✅ All signatures have been applied using internal certificates.</p>
+    <p>📋 The document is ready for download and validation.</p>
 
-              <div className="signers-completed">
-                <h4>👥 Signed by ({result.signing_urls.length}):</h4>
-                {result.signing_urls.map((signer, index) => (
-                  <div key={index} className="signer-completed">
-                    <div className="signer-info">
-                      <span className="signer-details">
-                        {index + 1}. {signer.signer_name} ({signer.signer_email})
-                      </span>
-                      <span className="completed-badge">✅ Completed</span>
-                    </div>
-                    {signer.signed_at && (
-                      <small className="signed-time">
-                        Signed at: {new Date(signer.signed_at).toLocaleString()}
-                      </small>
-                    )}
-                  </div>
-                ))}
-              </div>
+    <div className="signers-completed">
+      <h4>👥 Signed by ({result.signing_urls.length}):</h4>
+      {result.signing_urls.map((signer, index) => (
+        <div key={index} className="signer-completed">
+          <div className="signer-info">
+            <span className="signer-details">
+              {index + 1}. {signer.signer_name} ({signer.signer_email})
+            </span>
+            <span className="completed-badge">✅ Completed</span>
+          </div>
+          <small className="signed-time">
+            Signed at: {new Date(signer.signed_at).toLocaleString()}
+          </small>
+        </div>
+      ))}
+    </div>
 
-              <div className="service-actions">
-                {getDownloadUrl(currentService, result.document_id) && (
-                  <button
-                    onClick={() => window.open(getDownloadUrl(currentService, result.document_id), '_blank')}
-                    className="download-btn primary"
-                  >
-                    📥 Download Signed Document
-                  </button>
-                )}
+    <div className="selfsign-actions">
+      <button
+        onClick={() => window.open(`${baseUrl}/api/selfsign/documents/${result.document_id}/download`, '_blank')}
+        className="download-btn primary"
+      >
+        📥 Download Signed Document
+      </button>
 
-                {signers.some(s => s.mode === 'DIRECT_SIGNING') && (
-                  <button
-                    onClick={() => window.open(getDocumentUrl(currentService, result.document_id), '_blank')}
-                    className="view-document-btn secondary"
-                  >
-                    📄 View Document Details
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Pending services (like scrive, docusign) */
-            <div className="pending-service-result">
+      {/* Add button to go to document URL for DIRECT_SIGNING */}
+      {signers.some(s => s.mode === 'DIRECT_SIGNING') && (
+        <button
+          onClick={() => window.open(`${baseUrl}/documents/${result.document_id}`, '_blank')}
+          className="view-document-btn secondary"
+        >
+          📄 View Document Details
+        </button>
+      )}
+    </div>
+  </div>
+) : (
+            /* Code for other services */
+            <div className="external-service-result">
               <div className="signing-urls">
                 <h4>📝 Signing Information:</h4>
                 {result.signing_urls.map((signer, index) => (

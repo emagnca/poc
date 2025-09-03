@@ -18,9 +18,8 @@ from pyhanko.sign.validation import validate_pdf_signature
 from pyhanko.stamp import TextStampStyle
 from pyhanko.pdf_utils.font import opentype
 from pyhanko.pdf_utils import misc
-
-import logging, traceback
-from bson import ObjectId
+import logging
+import traceback
 
 from .document_storage import DocumentStorageClient
 
@@ -159,13 +158,9 @@ class SelfSignService:
 
 
     def sign_document(self, document_path: str, signers_data: List[Dict], metadata: Optional[Dict] = None) -> Dict[str, Any]:
-        """Sign document with multiple signers and return URLs for DIRECT_SIGNING"""
+        """Sign document with multiple signers and visual signatures using pyHanko stamps"""
         try:
-            # Generate a proper MongoDB ObjectId for document_id
-            document_id = str(ObjectId())
-
-            # Keep the custom ID for local storage if needed
-            local_document_id = f"self_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{hash(document_path) % 10000}"
+            document_id = f"self_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{hash(document_path) % 10000}"
 
             # Initialize storage variables
             storage_document_id = document_id
@@ -186,7 +181,6 @@ class SelfSignService:
                 for i, signer_data in enumerate(signers_data):
                     signer_email = signer_data['signer_email']
                     signer_name = signer_data['signer_name']
-                    signer_mode = signer_data.get('mode', 'DIRECT_SIGNING')
                     signing_time = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
 
                     # Get or create certificate for signer
@@ -209,7 +203,7 @@ class SelfSignService:
                     # Create signature field
                     field_name = f"Signature_{i+1}_{signer_email.replace('@', '_at_').replace('.', '_')}"
 
-                    # Create signature appearance using TextStampStyle
+                    # Create signature appearance using TextStampStyle (simplified)
                     stamp_style = TextStampStyle(
                         stamp_text=(
                             f"Digitally signed by: {signer_name}\n"
@@ -241,7 +235,7 @@ class SelfSignService:
                         app_build_props=stamp_style  # Add the visual stamp
                     )
 
-                    # Sign the document
+                    # Sign the document with visual appearance
                     signed_output = BytesIO()
                     try:
                         signers.sign_pdf(
@@ -278,18 +272,30 @@ class SelfSignService:
                         with open(temp_path, 'wb') as f:
                             f.write(signed_output.getvalue())
 
+                    # For self-signing, we consider it immediately signed
+                    signing_urls.append({
+                        "signer_email": signer_email,
+                        "signer_name": signer_name,
+                        "signing_url": None,
+                        "signed": True,
+                        "signed_at": datetime.now(timezone.utc).isoformat(),
+                        "mode": signer_data.get('mode', 'DIRECT_SIGNING'),
+                        "status": "completed",
+                        "has_visual_signature": True
+                    })
+
                 # Read the final signed document
                 with open(temp_path, 'rb') as f:
                     signed_pdf_data = f.read()
 
                 # Try to upload to external storage
-                if self.ensure_authenticated():
+                if self.storage_client.is_authenticated():
                     try:
-                        filename = f"signed_document_{local_document_id}.pdf"
+                        filename = f"signed_document_{document_id}.pdf"
                         success, storage_result = self.storage_client.upload(
                             data=signed_pdf_data,
                             filename=filename,
-                            document_id=None
+                            document_id=document_id
                         )
 
                         if success:
@@ -303,43 +309,15 @@ class SelfSignService:
                 else:
                     logger.info("Storage not authenticated, saving locally only")
 
-                # Always save locally as backup using the custom ID
-                local_path = f"signed_documents/{local_document_id}.pdf"
+                # Always save locally as backup
+                local_path = f"signed_documents/{document_id}.pdf"
                 os.makedirs("signed_documents", exist_ok=True)
                 with open(local_path, 'wb') as f:
                     f.write(signed_pdf_data)
                 logger.info(f"Document saved locally: {local_path}")
 
-                # Generate signing URLs for each signer based on their mode
-                for i, signer_data in enumerate(signers_data):
-                    signer_email = signer_data['signer_email']
-                    signer_name = signer_data['signer_name']
-                    signer_mode = signer_data.get('mode', 'DIRECT_SIGNING')
-
-                    # Generate signing URL if DIRECT_SIGNING mode
-                    signing_url = None
-                    if signer_mode == 'DIRECT_SIGNING':
-                        # Use the document storage client to get download URL
-                        if uploaded_to_storage:
-                            signing_url = self.storage_client.get_download_url(storage_document_id)
-                        else:
-                            # Fallback to local download URL using the custom ID
-                            signing_url = f"/api/selfsign/documents/{local_document_id}/download"
-
-                    signing_urls.append({
-                        "signer_email": signer_email,
-                        "signer_name": signer_name,
-                        "signing_url": signing_url,
-                        "signed": True,  # Self-signing is immediately completed
-                        "signed_at": datetime.now(timezone.utc).isoformat(),
-                        "mode": signer_mode,
-                        "status": "completed",
-                        "has_visual_signature": True
-                    })
-
                 return {
-                    "document_id": storage_document_id,  # Return the ObjectId for consistency
-                    "local_document_id": local_document_id,  # Include custom ID for local reference
+                    "document_id": storage_document_id,
                     "status": "completed",
                     "service": "selfsign",
                     "signing_urls": signing_urls,
@@ -358,97 +336,66 @@ class SelfSignService:
             logger.error(f"Error in self-signing: {str(e)}")
             raise Exception(f"Self-signing failed: {str(e)}")
 
-
-    async def download_document(self, document_id: str):
-        """Download signed document by ID"""
+    def get_document_status(self, document_id: str) -> Dict[str, Any]:
+        """Get document status - for self-signed docs, they're always completed"""
         try:
-            # Try to find the document locally first
-            local_paths = [
-                f"signed_documents/{document_id}.pdf",  # Direct ID match
-                f"signed_documents/self_{document_id}.pdf"  # With self prefix
-            ]
-
-            # Also check for files that contain the document_id
-            #import glob
-            #pattern_paths = glob.glob(f"signed_documents/*{document_id}*.pdf")
-            #local_paths.extend(pattern_paths)
-
-            #for local_path in local_paths:
-            #    if os.path.exists(local_path):
-            #        from fastapi.responses import FileResponse
-            #        return FileResponse(
-            #            local_path,
-            #            media_type='application/pdf',
-            #            filename=f"signed_document_{document_id}.pdf"
-            #        )
-
-            # Try to download from storage if not found locally
-            logger.info("Download if authenticated")
-            if self.ensure_authenticated():
-                logger.info("Was authenticated")
-                try:
-                    download_url = self.storage_client.get_download_url(document_id)
-                    if download_url:
-                        from fastapi.responses import RedirectResponse
-                        return RedirectResponse(url=download_url)
-                except Exception as e:
-                    logger.error(f"Error getting download URL from storage: {e}")
-
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="Document not found")
-
-        except Exception as e:
-            logger.error(f"Error downloading document {document_id}: {str(e)}")
-            from fastapi import HTTPException
-            raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
-
-    async def get_document_status(self, document_id: str) -> Dict[str, Any]:
-        """Get document status for self-signed documents"""
-        try:
-            # Check if document exists locally
-            import glob
-            local_files = glob.glob(f"signed_documents/*{document_id}*.pdf")
-
-            if local_files:
-                # Document exists locally
-                local_file = local_files[0]
-                file_stats = os.stat(local_file)
-
+            # First check local storage
+            local_path = f"signed_documents/{document_id}.pdf"
+            if os.path.exists(local_path):
                 return {
                     "document_id": document_id,
-                    "status": "completed",
                     "service": "selfsign",
-                    "created_at": datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
-                    "completed_at": datetime.fromtimestamp(file_stats.st_mtime).isoformat(),
-                    "file_size": file_stats.st_size,
-                    "local_path": local_file,
-                    "metadata": {}
+                    "status": "completed",
+                    "signed": True,
+                    "storage_id": document_id,
+                    "local_path": local_path,
+                    "last_updated": datetime.now(timezone.utc).isoformat()
                 }
 
-            # Check storage if not found locally
-            if self.ensure_authenticated():
-                try:
-                    # Try to get document info from storage
-                    download_url = self.storage_client.get_download_url(document_id)
-                    if download_url:
-                        return {
-                            "document_id": document_id,
-                            "status": "completed",
-                            "service": "selfsign",
-                            "storage_url": download_url,
-                            "metadata": {}
-                        }
-                except Exception as e:
-                    logger.error(f"Error checking storage for document {document_id}: {e}")
+            # Try external storage if authenticated
+            if self.storage_client.is_authenticated():
+                success, result = self.storage_client.get_download_url(document_id)
+                if success:
+                    return {
+                        "document_id": document_id,
+                        "service": "selfsign",
+                        "status": "completed",
+                        "signed": True,
+                        "storage_id": document_id,
+                        "last_updated": datetime.now(timezone.utc).isoformat()
+                    }
 
-            # Document not found
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise Exception(f"Document {document_id} not found")
 
         except Exception as e:
-            logger.error(f"Error getting status for document {document_id}: {str(e)}")
-            from fastapi import HTTPException
-            raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+            logger.error(f"Error getting document status: {str(e)}")
+            return {
+                "document_id": document_id,
+                "service": "selfsign",
+                "status": "error",
+                "signed": False,
+                "error": str(e)
+            }
+
+    def download_document(self, document_id: str) -> bytes:
+        """Download the signed document"""
+        logger.info("--->download_document")
+        # First try local storage
+        local_path = f"signed_documents/{document_id}.pdf"
+        if os.path.exists(local_path):
+            with open(local_path, 'rb') as f:
+                return f.read()
+
+        # If external storage is available, try that
+        if self.ensure_authenticated():
+            logger.info("Getting from TinyDS")
+            success, result = self.storage_client.download(document_id, as_pdf=True)
+            if success:
+                return result
+            else:
+                raise Exception(f"Failed to download document from storage: {result}")
+
+        raise Exception(f"Document {document_id} not found")
 
     def get_download_url(self, document_id: str) -> str:
         """Get direct download URL for document"""

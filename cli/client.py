@@ -342,6 +342,8 @@ class DocumentSigningClient(cmd2.Cmd):
             params = {}
             if args.handler:
                 params['handler'] = args.handler
+            if args.service:
+                params['service'] = args.service
             if args.system:
                 params['system'] = args.system
             if args.status:
@@ -358,7 +360,7 @@ class DocumentSigningClient(cmd2.Cmd):
                 self.poutput("Use --help to see available search options")
                 return
 
-            url = f"{self.base_url}/api/{service}/documents/search"
+            url = f"{self.base_url}/api/signatures/search"
             response = self.session.get(url, params=params)
 
             if response.status_code == 200:
@@ -420,7 +422,7 @@ class DocumentSigningClient(cmd2.Cmd):
 
         # Try to search by title first
         try:
-            url = f"{self.base_url}/api/{self.current_service}/documents/search"
+            url = f"{self.base_url}/api/signatures/search"
             params = {'title': search_term, 'limit': 10}
             response = self.session.get(url, params=params)
 

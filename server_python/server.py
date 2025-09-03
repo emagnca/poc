@@ -1,56 +1,37 @@
-# server.py
-
-# Standard library imports
-import asyncio
-import concurrent.futures
-import json
-import logging
-import os
-import tempfile
-import traceback
-import webbrowser
-from datetime import datetime
-from typing import Optional, Dict, Any, List
-
-# Third-party imports
+# Try this import order in server.py:
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Path, Query, Request, Response, Depends
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
-# Local imports - Models
-from models import (
-    SigningService,
-    Signer,
-    SigningResponse,
-    DocumentStatus,
-    SigningMode,
-    SignatureCreate,
-    UserInDB,
-    Signature
-)
+import json
+import logging
+import traceback
 
-# Local imports - Database
+# Import models first
+from models import SigningService, Signer, SigningResponse, DocumentStatus, SigningMode, SignatureCreate, UserInDB, Signature
+
+# Then database
 from database import get_database, connect_to_mongo, close_mongo_connection
 import crud
 
-# Local imports - Authentication
+# Then auth (after models)
 from auth import get_current_active_user, get_current_admin_user
 
-# Local imports - Routes
+# Then routes
 from routes.database import router as db_router
 from routes.auth import router as auth_router
 from routes.selfsign import router as selfsign_router
 
-# Local imports - Services
+# Then your service imports
 import scrive
+import webbrowser
 from scrive import BASE_URL
 from docusign import DocuSignService
 from docusign_oauth import DocuSignOAuth
-from services.selfsign import selfsign
-
-
 
 
 # Configure logging
@@ -101,87 +82,132 @@ def validate_service(service):
             detail=f"Unsupported service '{service}'. Supported services: {supported_services}"
         )
 
+# API Endpoints
 @app.post("/api/{service}/sign", response_model=SigningResponse)
-async def sign_document(
-        service: str,
-        document: UploadFile = File(...),
-        signers: str = Form(...),
-        metadata: str = Form(None),
+async def initiate_signing_process(
+        service: str = Path(..., description="Signing service (scrive or docusign)"),
+        document: UploadFile = File(..., description="PDF document to be signed"),
+        signers: str = Form(..., description="JSON array of signers with email, name, and mode"),
+        metadata: str = Form(None, description="Optional metadata as JSON string"),
         current_user: UserInDB = Depends(get_current_active_user),
         db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Universal document signing endpoint for all services"""
+    """
+    Initiate the document signing process with specified service and multiple signers
+
+    - **service**: Signing service provider (scrive or docusign)
+    - **document**: PDF file to be signed
+    - **signers**: JSON string containing array of signer objects
+      Example: '[{"signer_email":"john@example.com","signer_name":"John Doe","mode":"DIRECT_SIGNING"}]'
+    """
     try:
         # Validate service
-        if service not in ["scrive", "docusign", "selfsign"]:
-            raise HTTPException(status_code=400, detail=f"Unsupported service: {service}")
+        validated_service = validate_service(service)
+        metadata_data = json.loads(metadata) if metadata else {}
 
-        # Parse signers and metadata
-        signer_objects = [Signer(**signer) for signer in json.loads(signers)]
-        metadata_dict = json.loads(metadata) if metadata else {}
-
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-            content = await document.read()
-            temp_file.write(content)
-            temp_path = temp_file.name
-
+        # Parse signers JSON
         try:
-            # Route to appropriate service
-            if service == "selfsign":
-                # Handle self-signing with thread pool to avoid event loop conflict
-                loop = asyncio.get_event_loop()
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    response = await loop.run_in_executor(
-                        executor,
-                        selfsign.sign_document,
-                        temp_path,
-                        [signer.dict() for signer in signer_objects],
-                        metadata_dict
-                    )
+            signers_data = json.loads(signers)
+            # Validate each signer using Pydantic
+            signer_objects = [Signer(**signer) for signer in signers_data]
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON format for signers")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid signer data: {str(e)}")
 
-            elif service == "scrive":
-                from services.scrive import scrive
-                response = await scrive.sign_document(
-                    temp_path,
-                    [signer.dict() for signer in signer_objects],
-                    metadata_dict
-                )
+        if not signer_objects:
+            raise HTTPException(status_code=400, detail="At least one signer is required")
 
-            elif service == "docusign":
-                from services.docusign import docusign
-                response = await docusign.sign_document(
-                    temp_path,
-                    [signer.dict() for signer in signer_objects],
-                    metadata_dict
-                )
+        logger.info(f"Initiating signing process with {validated_service.value} service for {len(signer_objects)} signers")
 
-            # Store signatures in database for all services
-            for signer_obj in signer_objects:
+        # Validate file type
+        if not document.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+        # Validate file size (e.g., max 10MB)
+        file_content = await document.read()
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB
+            raise HTTPException(status_code=400, detail="File size too large (max 10MB)")
+
+        # Reset file pointer for processing
+        await document.seek(0)
+
+        print(signer_objects)
+
+        # Route to appropriate service
+        if validated_service == SigningService.SCRIVE:
+            # TODO: Integrate with Scrive service for multiple signers
+            # result = scrive_service.initiate_signing_process(document, signer_objects)
+
+            # Mock response with multiple signing URLs
+            signing_urls = []
+            signer_data = scrive.initiate_signing_process(file_content, signer_objects, metadata_data)
+            for i, signer in enumerate(signer_data[1]):
+                signing_url = signer.get('signing_url')
+                signing_urls.append({
+                    "signer_email": signer.get('signer_email'),
+                    "signing_url": BASE_URL + signing_url if signing_url else '',
+                })
+
+            response = SigningResponse(
+                document_id=signer_data[0],
+                signing_urls=signing_urls,
+                service="scrive"
+            )
+
+        elif validated_service == SigningService.DOCUSIGN:
+            # TODO: Integrate with DocuSign service for multiple signers
+            # result = docusign_service.initiate_signing_process(document, signer_objects)
+
+            # Mock response with multiple signing URLs
+            signing_urls = []
+            for i, signer in enumerate(signer_objects):
+                signing_urls.append({
+                    "signer_email": signer.signer_email,
+                    "signer_name": signer.signer_name,
+                    "signing_url": f"https://demo.docusign.net/signing/startinsession.aspx?t=env123_signer{i+1}",
+                    "mode": signer.mode
+                })
+
+            r = docusign.initiate_signing_process(file_content, signer_objects, metadata_data)
+            print("Create signing response")
+            response = SigningResponse(
+                document_id=r.get('document_id'),
+                signing_urls=r.get('signing_urls'),
+                service="docusign"
+            )
+            print("SigningResposne created")
+
+        # After successful signing, store signatures in MongoDB
+        for signer_url in response.signing_urls:
+            # Find the corresponding signer object
+            signer_obj = next((s for s in signer_objects if s.signer_email == signer_url["signer_email"]), None)
+            if signer_obj:
+                print("Storing signature")
                 signature_data = SignatureCreate(
-                    document_id=response["document_id"],
-                    signature_request_id=response["document_id"],
+                    document_id=response.document_id,
+                    signature_request_id=response.document_id,
                     user_id=current_user.id,
                     signer_email=signer_obj.signer_email,
                     signer_name=signer_obj.signer_name,
                     service=service,
-                    status="completed" if service == "selfsign" else "pending",
-                    signing_url=None if service == "selfsign" else response.get("signing_urls", [{}])[0].get("signing_url"),
-                    metadata=metadata_dict
+                    status="sent",
+                    signing_url=signer_url.get("signing_url"),
+                    metadata=metadata_data
                 )
+                print("Storing in db")
 
+                # Store in MongoDB
                 await crud.create_signature(db=db, signature=signature_data)
 
-            return response
+        logger.info(f"Successfully created signing document with {validated_service.value}: {response.document_id}")
+        return response
 
-        finally:
-            # Clean up temp file
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in {service} signing: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"{service.title()} signing failed: {str(e)}")
+        logger.error(f"Error initiating signing process: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 def map_docusign_status(docusign_status: str) -> str:
     return docusign_status.lower()
@@ -264,134 +290,115 @@ async def get_document_status(
         logger.error(f"Error getting document status: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.put("/api/signatures/{signature_id}/status")
+async def update_signature_status(
+        signature_id: str,
+        current_user: UserInDB = Depends(get_current_active_user),
+        db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Update a specific signature's status from the external service"""
+    try:
+        if not ObjectId.is_valid(signature_id):
+            raise HTTPException(status_code=400, detail="Invalid signature ID")
+
+        # Get the signature from database
+        signature = await db.signatures.find_one({
+            "_id": ObjectId(signature_id),
+            "user_id": current_user.id
+        })
+
+        if not signature:
+            raise HTTPException(status_code=404, detail="Signature not found")
+
+        # Get status from external service
+        service = signature["service"]
+        document_id = signature["document_id"]
+
+        if service == "scrive":
+            status_data = scrive.get_document_status(document_id)
+        elif service == "docusign":
+            status_data = docusign.get_document_status(document_id)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported service")
+
+        # Update the signature
+        update_result = await db.signatures.update_one(
+            {"_id": ObjectId(signature_id)},
+            {
+                "$set": {
+                    "status": status_data.get("status", "unknown"),
+                    "signed": status_data.get("signed", False),
+                    "updated_at": datetime.utcnow(),
+                    "last_status_check": datetime.utcnow(),
+                    "external_status_data": status_data
+                }
+            }
+        )
+
+        if update_result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Signature not updated")
+
+        # Return updated signature
+        updated_signature = await db.signatures.find_one({"_id": ObjectId(signature_id)})
+        updated_signature = convert_objectids_to_strings(updated_signature)
+
+        return Signature(**updated_signature)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating signature status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @app.get("/api/{service}/documents/{document_id}/download")
-async def download_document(
-        service: str,
-        document_id: str,
+async def download_signed_document(
+        service: str = Path(..., description="Signing service (scrive or docusign)"),
+        document_id: str = Path(..., description="Document ID"),
         current_user: UserInDB = Depends(get_current_active_user)
 ):
-    """Universal document download endpoint for all services"""
+    """
+    Download the signed document from specified service
+
+    - **service**: Signing service provider (scrive or docusign)
+    - **document_id**: The ID of the document to download
+    """
     try:
         # Validate service
-        if service not in ["scrive", "docusign", "selfsign"]:
-            raise HTTPException(status_code=400, detail=f"Unsupported service: {service}")
+        validated_service = validate_service(service)
+
+        logger.info(f"Download request for document: {document_id} from {validated_service.value}")
 
         # Route to appropriate service
-        if service == "selfsign":
-            from services.selfsign import selfsign
-            return await selfsign.download_document(document_id)
+        if validated_service == SigningService.SCRIVE:
 
-        elif service == "scrive":
-            from services.scrive import scrive
-            return await scrive.download_document(document_id)
+            # Download the signed document from Scrive
+            document_content = scrive.get_document(document_id)
 
-        elif service == "docusign":
-            from services.docusign import docusign
-            return await docusign.download_document(document_id)
+            # Return the document as a file download
+            return Response(
+                content=document_content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename=signed_document_{document_id}.pdf"
+                }
+            )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error downloading document from {service}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
-
-@app.get("/api/{service}/documents/{document_id}/status")
-async def get_document_status(
-        service: str,
-        document_id: str,
-        current_user: UserInDB = Depends(get_current_active_user),
-        db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    """Universal document status endpoint for all services"""
-    try:
-        # Validate service
-        if service not in ["scrive", "docusign", "selfsign"]:
-            raise HTTPException(status_code=400, detail=f"Unsupported service: {service}")
-
-        # Route to appropriate service
-        if service == "selfsign":
-            from services.selfsign import selfsign
-            status_data = await selfsign.get_document_status(document_id)
-
-        elif service == "scrive":
-            from services.scrive import scrive
-            status_data = await scrive.get_document_status(document_id)
-
-        elif service == "docusign":
-            from services.docusign import docusign
-            status_data = await docusign.get_document_status(document_id)
-
-        # Also get database signatures for additional context
-        signatures = await crud.get_signatures_by_document_id(db, document_id)
-
-        # Combine service status with database info
-        return {
-            **status_data,
-            "database_signatures": [
-                {
-                    "signer_email": sig.signer_email,
-                    "signer_name": sig.signer_name,
-                    "status": sig.status,
-                    "created_at": sig.created_at,
-                    "signed_at": sig.signed_at
-                } for sig in signatures
-            ]
-        }
+        elif validated_service == SigningService.DOCUSIGN:
+            document_content = docusign.get_signed_document(document_id)
+            return Response(
+                content=document_content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename=signed_document_{document_id}.pdf"
+                }
+            )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting status from {service}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
-
-@app.get("/api/{service}/documents/{document_id}")
-async def get_document_details(
-        service: str,
-        document_id: str,
-        current_user: UserInDB = Depends(get_current_active_user),
-        db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    """Universal document details endpoint for all services"""
-    try:
-        # Validate service
-        if service not in ["scrive", "docusign", "selfsign"]:
-            raise HTTPException(status_code=400, detail=f"Unsupported service: {service}")
-
-        # Get document status from service
-        status_data = await get_document_status(service, document_id, current_user, db)
-
-        # Get signatures from database
-        signatures = await crud.get_signatures_by_document_id(db, document_id)
-
-        return {
-            "document_id": document_id,
-            "service": service,
-            "status": status_data.get("status", "unknown"),
-            "metadata": status_data.get("metadata", {}),
-            "signatures": [
-                {
-                    "id": str(sig.id),
-                    "signer_email": sig.signer_email,
-                    "signer_name": sig.signer_name,
-                    "status": sig.status,
-                    "signing_url": sig.signing_url,
-                    "created_at": sig.created_at,
-                    "signed_at": sig.signed_at,
-                    "metadata": sig.metadata
-                } for sig in signatures
-            ],
-            "download_url": f"/api/{service}/documents/{document_id}/download",
-            "created_at": status_data.get("created_at"),
-            "completed_at": status_data.get("completed_at")
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting document details from {service}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Document details failed: {str(e)}")
-
-
+        traceback.print_exc()
+        logger.error(f"Error downloading document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/api/{service}/documents/search")

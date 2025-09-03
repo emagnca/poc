@@ -43,6 +43,7 @@ async def register(user: UserCreate, db: AsyncIOMotorDatabase = Depends(get_data
 @router.post("/login", response_model=Token)
 async def login(user_credentials: UserLogin, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Login with email and password"""
+    print("In login")
     user = await authenticate_user(db, user_credentials.email, user_credentials.password)
     if not user:
         raise HTTPException(
