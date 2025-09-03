@@ -1,0 +1,63 @@
+/* src/components/ServiceSelector.css */
+.service-selector {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.service-selector h3 {
+  margin: 0 0 15px 0;
+  color: #495057;
+  font-size: 18px;
+}
+
+.service-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.service-button {
+  padding: 12px 20px;
+  border: 2px solid #dee2e6;
+  background-color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.service-button:hover {
+  border-color: #667eea;
+  background-color: #f8f9ff;
+}
+
+.service-button.active {
+  border-color: #667eea;
+  background-color: #667eea;
+  color: white;
+}
+
+.service-loading {
+  padding: 20px;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .service-buttons {
+    flex-direction: column;
+  }
+
+  .service-button {
+    justify-content: center;
+  }
+}

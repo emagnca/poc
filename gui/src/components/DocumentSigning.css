@@ -1,0 +1,544 @@
+/* DocumentSigning.css */
+.document-signing {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.signing-form {
+  background-color: white;
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.file-info {
+  color: #28a745;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+/* Signers Section */
+.signers-section {
+  margin: 30px 0;
+}
+
+.signer-group {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 15px;
+}
+
+.signer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.signer-header h4 {
+  margin: 0;
+  color: #495057;
+}
+
+.remove-signer {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.remove-signer:hover {
+  background-color: #c82333;
+}
+
+.signer-fields {
+  display: grid;
+  gap: 15px;
+}
+
+.add-signer {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.add-signer:hover {
+  background-color: #218838;
+}
+
+.mode-description {
+  color: #6c757d;
+  font-size: 12px;
+  font-style: italic;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Metadata Section */
+.metadata-section {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.custom-fields-section {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #dee2e6;
+}
+
+.custom-fields-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.custom-fields-header h4 {
+  margin: 0;
+  color: #495057;
+}
+
+.add-custom-field {
+  background-color: #17a2b8;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.add-custom-field:hover {
+  background-color: #138496;
+}
+
+.no-custom-fields {
+  color: #6c757d;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px dashed #dee2e6;
+  border-radius: 6px;
+}
+
+.custom-field {
+  margin-bottom: 10px;
+}
+
+.custom-field-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.custom-field-key {
+  flex: 1;
+  min-width: 150px;
+}
+
+.custom-field-value {
+  flex: 2;
+}
+
+.remove-custom-field {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.remove-custom-field:hover {
+  background-color: #c82333;
+}
+
+/* Submit Button */
+.submit-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 20px;
+  transition: background-color 0.3s ease;
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.submit-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Error and Result Messages */
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 20px 0;
+  border: 1px solid #f5c6cb;
+}
+
+.result {
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.result h3 {
+  color: #155724;
+  margin-top: 0;
+}
+
+/* Self-sign specific styles */
+.selfsign-result {
+  background-color: #f8fff8;
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.success-message {
+  color: #155724;
+  font-size: 18px;
+  margin-bottom: 15px;
+  text-align: center;
+  padding: 10px;
+  background-color: #d4edda;
+  border-radius: 6px;
+}
+
+.signers-completed {
+  margin: 20px 0;
+}
+
+.signer-completed {
+  background-color: white;
+  border: 1px solid #d4edda;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.signer-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.signer-details {
+  font-weight: 500;
+}
+
+.completed-badge {
+  background-color: #28a745;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.signed-time {
+  color: #6c757d;
+  font-size: 12px;
+}
+
+.selfsign-actions {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.download-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.download-btn:hover {
+  background-color: #0056b3;
+}
+
+/* External service styles */
+.external-service-result {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.signing-urls {
+  margin-bottom: 20px;
+}
+
+.signer-url {
+  background-color: white;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 10px;
+}
+
+.signing-link {
+  display: inline-block;
+  background-color: #007bff;
+  color: white;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  margin-top: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.signing-link:hover {
+  background-color: #0056b3;
+  text-decoration: none;
+  color: white;
+}
+
+.signing-mode {
+  font-size: 12px;
+  color: #6c757d;
+  margin-left: 10px;
+  padding: 2px 6px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.no-url {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.next-steps {
+  background-color: #e9ecef;
+  padding: 15px;
+  border-radius: 6px;
+}
+
+.next-steps h4 {
+  margin-top: 0;
+  color: #495057;
+}
+
+.next-steps ol {
+  margin-bottom: 0;
+  padding-left: 20px;
+}
+
+.next-steps li {
+  margin-bottom: 8px;
+}
+
+/* Metadata display in results */
+.result-metadata {
+  background-color: #e9ecef;
+  border-radius: 6px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.result-metadata h4 {
+  margin-top: 0;
+  color: #495057;
+}
+
+.metadata-display p {
+  margin: 8px 0;
+}
+
+.custom-metadata ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.custom-metadata li {
+  margin-bottom: 4px;
+}
+
+/* Storage warning */
+.storage-warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+  padding: 10px;
+  border-radius: 6px;
+  margin-top: 15px;
+  text-align: center;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .document-signing {
+    padding: 10px;
+  }
+
+  .signing-form {
+    padding: 20px;
+  }
+
+  .custom-field-inputs {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .custom-field-key,
+  .custom-field-value {
+    min-width: auto;
+  }
+
+  .signer-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+//==========================
+.selfsign-actions {
+  text-align: center;
+  margin-top: 20px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.view-document-btn {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.view-document-btn:hover {
+  background-color: #545b62;
+}
+
+@media (max-width: 768px) {
+  .selfsign-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .download-btn,
+  .view-document-btn {
+    width: 100%;
+    max-width: 300px;
+  }
+}
+{/* Special handling for selfsign */}
+{currentService === 'selfsign' ? (
+  <div className="selfsign-result">
+    <div className="success-message">
+      🔐 <strong>Document signed successfully!</strong>
+    </div>
+    <p>✅ All signatures have been applied using internal certificates.</p>
+    <p>📋 The document is ready for download and validation.</p>
+
+    <div className="signers-completed">
+      <h4>👥 Signed by ({result.signing_urls.length}):</h4>
+      {result.signing_urls.map((signer, index) => (
+        <div key={index} className="signer-completed">
+          <div className="signer-info">
+            <span className="signer-details">
+              {index + 1}. {signer.signer_name} ({signer.signer_email})
+            </span>
+            <span className="completed-badge">✅ Completed</span>
+          </div>
+          <small className="signed-time">
+            Signed at: {new Date(signer.signed_at).toLocaleString()}
+          </small>
+        </div>
+      ))}
+    </div>
+
+    <div className="selfsign-actions">
+      <button
+        onClick={() => window.open(`${baseUrl}/api/selfsign/documents/${result.document_id}/download`, '_blank')}
+        className="download-btn primary"
+      >
+        📥 Download Signed Document
+      </button>
+
+      {/* Add button to go to document URL for DIRECT_SIGNING */}
+      {signers.some(s => s.mode === 'DIRECT_SIGNING') && (
+        <button
+          onClick={() => window.open(`${baseUrl}/documents/${result.document_id}`, '_blank')}
+          className="view-document-btn secondary"
+        >
+          📄 View Document Details
+        </button>
+      )}
+    </div>
+  </div>
+) : (
+  // ... rest of external service code
+)}
